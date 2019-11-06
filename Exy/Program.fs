@@ -9,8 +9,19 @@ let print txt = printf "%s" txt
 let printn txt = printfn "%s" txt
 
 /// Handle a statement.
-let handleStatement statement (state: State) =
+let rec handleStatement (state: State) statement =
     match statement with
+    | Clear n ->
+        state |> Map.remove n
+    | Exit ->
+        Environment.Exit 0
+        state
+    | Load fileName ->
+        state // TODO: import state by folding over statements to execute.
+
+    | Save fileName ->
+        System.IO.File.WriteAllLines (fileName, state |> Map.toList |> List.map (fun (k, e) -> sprintf "%s = %s" k (displayExpr e)))
+        state
     | Binding (n, e) ->
         let used = usedVars state e
         if Set.contains n used then
@@ -18,11 +29,6 @@ let handleStatement statement (state: State) =
             state
         else
             state |> Map.remove n |> Map.add n e
-    | Clear n ->
-        state |> Map.remove n
-    | Exit ->
-        Environment.Exit 0
-        state
     | Calculation e ->
         let varVal = expandVariable state e
         let expanded = expand state e
@@ -47,7 +53,7 @@ let iteration state: State =
 
     match result with
     | P.Success value ->
-        handleStatement value state
+        handleStatement state value
     | P.Error e ->
         printfn "Error: %s" e
         state

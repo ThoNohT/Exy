@@ -15,15 +15,23 @@ type ParseResult<'T> =
 /// Parse and ignore whitespace characters.
 let private ws = P.unicodeSpaces
 
+/// Parse a numeric character.
+let private numeric =
+    parse {
+        let! r = P.regex "[0-9]"
+        return r.Chars 0
+    }
+
+/// Parse an alphanumeric character.
+let private alphaNumeric = P.asciiLetter <|> numeric
+
+/// parse a file name, formatted as filename.exy
+let private fileName : Parser<string, unit> =
+    P.many1Chars alphaNumeric .>>. P.pstring ".exy" |>> (fun (a,b) -> sprintf "%s%s" a b)
+
 /// Parse a string representing a variable name. Starts with a letter and is followed by letters or numbers.
 let private varStr =
-    let numeric =
-        parse {
-            let! r = P.regex "[0-9]"
-            return r.Chars 0
-        }
-
-    P.many1Chars2 P.asciiLetter (P.asciiLetter <|> numeric)
+    P.many1Chars2 P.asciiLetter alphaNumeric
 
 /// Parse a variable name. The same as varStr, but wrapped in a Var.
 let private var : Parser<Expression, unit> =
@@ -73,14 +81,22 @@ let private clear : Parser<Statement, Unit> =
 
 /// Parse an exit statement, format: exit.
 let private exit : Parser<Statement, Unit> =
-        P.skipString "exit" .>>. ws
-        |>> (fun _ -> Exit)
+    P.skipString "exit" .>>. ws
+    |>> (fun _ -> Exit)
+
+let private save : Parser<Statement, Unit> =
+    P.skipString "save" .>>. ws >>. fileName
+    |>> Save
+
+let private load : Parser<Statement, Unit> =
+    P.skipString "save" .>>. ws >>. fileName
+    |>> Load
 
 /// Parse a statement. Can either be an binding, or an expression.
 let statement : Parser<Statement, unit> =
     let calculation = expression |>> Calculation
 
-    (P.attempt exit) <|> (P.attempt clear) <|> (P.attempt binding) <|> calculation
+    (P.attempt exit) <|> (P.attempt save) <|> (P.attempt load) <|> (P.attempt clear) <|> (P.attempt binding) <|> calculation
 
 /// Run a parser, allowing whitespace before and after the parser, requiring the entire string to match.
 /// Returns the result of running the provided parser on the provided input.

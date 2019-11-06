@@ -29,6 +29,10 @@ type Statement =
     | Calculation of Expression
     /// Exit the program.
     | Exit
+    /// Save the current state to a file.
+    | Save of string
+    /// Load new state from a file.
+    | Load of string
 
 /// The state allows expressions to be bound to variables.
 type State = Map<string, Expression>
@@ -56,14 +60,6 @@ let rec displayExpr expression =
     | Grp s -> sprintf "( %s )" (displayExpr s)
     | Var v -> v
     | Num n -> sprintf "%M" n
-
-/// Display a statement.
-let displayStmt statement =
-    match statement with
-    | Binding (n, e) -> sprintf "%s = %s" n (displayExpr e)
-    | Clear n  -> sprintf "Clear %s" n
-    | Calculation e -> displayExpr e
-    | Exit -> "Exit"
 
 /// Expand an expression a single step: Evaluate the expression or number behind a variable.
 let rec expandVariable state expression =
@@ -118,4 +114,4 @@ let rec usedVars state expression : Set<string> =
     | Sub (a, b) -> Set.union (usedVars state a) (usedVars state b)
     | Grp s -> usedVars state s
     | Var v -> Set.add v ((lookup state v) |> Option.map (usedVars state) |> Option.defaultValue Set.empty)
-    | Num n -> Set.empty
+    | Num _ -> Set.empty
