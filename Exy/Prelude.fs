@@ -30,3 +30,20 @@ module Result =
         match result with
         | Ok r -> r
         | Error e -> Error e
+
+    /// Returns the result value. If the result is an error, the error is displayed and a default value is returned.
+    let valueOrShowWithDefault defaultValue prefix result =
+        match result with
+        | Ok r -> r
+        | Error e ->
+            printfn "%s%s" prefix e
+            defaultValue
+
+    /// Returns the result, but displays a message if the result is Ok.
+    let showOnOk message result =
+        match result with
+        | Ok r ->
+            printfn "%s" message
+            Ok r
+        | Error e ->
+            Error e

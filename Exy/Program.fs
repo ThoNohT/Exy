@@ -1,34 +1,85 @@
 ﻿open System
+open System.IO
 module P = Parsing
 open Model
 
-// TODO: Load a file, serialize as a list of bindings that are just evaluated in turn and will also fail like manually entered ones.
-//       => This means no cycle detection is needed upon evaluation.
-
 let print txt = printf "%s" txt
 let printn txt = printfn "%s" txt
+
+/// Asks for confirmation, and keeps asking until a proper answer is provided.
+let rec askConfirmation () =
+    let input = Console.ReadLine ()
+    let result = P.parseLine P.confirmation input
+    match result with
+    | Ok r -> r
+    | Error _ ->
+        print "Unrecognized answer "
+        askConfirmation ()
+
+/// Saves the state to the provided filename, asks for confirmation if the file would be overwritten.
+let saveState (state: State) fileName =
+    let save () =
+        let fileContents =
+            state |> Map.toList
+            |> List.map (fun (k, e) -> sprintf "%s = %s" k (displayExpr e))
+        File.WriteAllLines (fileName, fileContents)
+        printfn "Saved %s." fileName
+
+    if File.Exists fileName then
+        print "File already exists: overwrite? (y/n) "
+        if askConfirmation () = Yes then save ()
+    else
+        save ()
+
+/// Handles a binding, returning an error if a binding is not possible.
+let handleBinding state statement =
+    match statement with
+    | Binding (var, expression) ->
+        let used = usedVars state expression
+        if Set.contains var used then
+            Error <| sprintf "Binding %s to variable %s would create a circular reference." var (displayExpr expression)
+        else
+            state |> Map.remove var |> Map.add var expression |> Ok
+    | _ ->
+        Error "Statement is not a binding."
+
+/// Loads new state from a filename. Returning the new state if succesful, or an error with an error message if not.
+let loadState fileName : Result<State,string> =
+    if not <| File.Exists fileName then
+        Error <| sprintf "File %s does not exist." fileName
+    else
+        let lines = File.ReadAllLines fileName |> List.ofArray
+
+        let folder acc curr =
+            Result.bind
+                (fun st -> P.parseLine P.statement curr |> Result.bind (handleBinding st))
+                acc
+
+        List.fold folder (Result.Ok Map.empty) lines
 
 /// Handle a statement.
 let rec handleStatement (state: State) statement =
     match statement with
     | Clear n ->
         state |> Map.remove n
+
     | Exit ->
         Environment.Exit 0
         state
+
     | Load fileName ->
-        state // TODO: import state by folding over statements to execute.
+        loadState fileName
+        |> Result.showOnOk (sprintf "%s succesfully loaded." fileName)
+        |> Result.valueOrShowWithDefault state (sprintf "Error loading %s: " fileName)
 
     | Save fileName ->
-        System.IO.File.WriteAllLines (fileName, state |> Map.toList |> List.map (fun (k, e) -> sprintf "%s = %s" k (displayExpr e)))
+        saveState state fileName
         state
-    | Binding (n, e) ->
-        let used = usedVars state e
-        if Set.contains n used then
-            printfn "Binding %s to variable %s would create a circular reference." n (displayExpr e)
-            state
-        else
-            state |> Map.remove n |> Map.add n e
+
+    | Binding _ ->
+        handleBinding state statement
+        |> Result.valueOrShowWithDefault state "Binding error: "
+
     | Calculation e ->
         let varVal = expandVariable state e
         let expanded = expand state e
@@ -49,14 +100,9 @@ let rec handleStatement (state: State) statement =
 let iteration state: State =
     print ">"
     let input = Console.ReadLine ()
-    let result = P.parseLine P.statement input
-
-    match result with
-    | P.Success value ->
-        handleStatement state value
-    | P.Error e ->
-        printfn "Error: %s" e
-        state
+    P.parseLine P.statement input
+        |> Result.map (handleStatement state)
+        |> Result.valueOrShowWithDefault state ""
 
 /// The main program entry point.
 [<EntryPoint>]

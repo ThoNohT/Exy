@@ -34,6 +34,9 @@ type Statement =
     /// Load new state from a file.
     | Load of string
 
+/// A confirmation to a question.
+type Confirmation = Yes | No
+
 /// The state allows expressions to be bound to variables.
 type State = Map<string, Expression>
 
@@ -44,9 +47,9 @@ let private lookup (state:State) var =
 /// Indicates whether an expression is binary or not.
 let private isBinary expression =
     match expression with
-    | Grp s -> false
-    | Var v -> false
-    | Num n -> false
+    | Grp _ -> false
+    | Var _ -> false
+    | Num _ -> false
     | _ -> true
 
 /// Display an expression.
@@ -92,7 +95,7 @@ let expand state expression =
 
 /// Evaluate an expression given a certain state.
 let rec evaluate state expression =
-    let safeDiv a b = if b = 0M then Result.fail "Division by 0" else Ok (a / b)
+    let safeDiv a b = if b = 0M then Result.fail "Division by 0." else Ok (a / b)
 
     match expression with
     | Sub (a, b) -> Result.map2 (-) (evaluate state a) (evaluate state b)
@@ -102,7 +105,7 @@ let rec evaluate state expression =
     | Div (a, b) -> Result.bind2 safeDiv (evaluate state a) (evaluate state b)
     | Grp g -> evaluate state g
     | Num n -> Ok n
-    | Var v -> lookup state v |> Option.map (evaluate state) |> Result.fromOption (sprintf "Unknown variable: %s" v) |> Result.unpack
+    | Var v -> lookup state v |> Option.map (evaluate state) |> Result.fromOption (sprintf "Unbound variable: %s." v) |> Result.unpack
 
 /// Return all variables used in an expression.
 let rec usedVars state expression : Set<string> =

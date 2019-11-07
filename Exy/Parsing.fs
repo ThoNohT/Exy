@@ -7,11 +7,6 @@ module P = FParsec.CharParsers
 module P = FParsec.Primitives
 module P = FParsec.Internals
 
-/// The result of parsing.
-type ParseResult<'T> =
-    | Success of 'T
-    | Error of string
-
 /// Parse and ignore whitespace characters.
 let private ws = P.unicodeSpaces
 
@@ -84,24 +79,36 @@ let private exit : Parser<Statement, Unit> =
     P.skipString "exit" .>>. ws
     |>> (fun _ -> Exit)
 
+// Parse a save statement, format: save filename.
 let private save : Parser<Statement, Unit> =
     P.skipString "save" .>>. ws >>. fileName
     |>> Save
 
+// Parse a load statement, format: load filename.
 let private load : Parser<Statement, Unit> =
-    P.skipString "save" .>>. ws >>. fileName
+    P.skipString "load" .>>. ws >>. fileName
     |>> Load
 
 /// Parse a statement. Can either be an binding, or an expression.
 let statement : Parser<Statement, unit> =
     let calculation = expression |>> Calculation
 
-    (P.attempt exit) <|> (P.attempt save) <|> (P.attempt load) <|> (P.attempt clear) <|> (P.attempt binding) <|> calculation
+    (P.attempt exit)
+    <|> (P.attempt save)
+    <|> (P.attempt load)
+    <|> (P.attempt clear)
+    <|> (P.attempt binding)
+    <|> calculation
+
+/// Parses a confirmation message. Can be either y/n/yes/no, case insensitive.
+let confirmation : Parser<Confirmation, unit> =
+    (P.regex "[Yy]([Ee][Ss])?" |>> (fun _ -> Yes))
+    <|> (P.regex "[Nn][Oo]?" |>> (fun _ -> No))
 
 /// Run a parser, allowing whitespace before and after the parser, requiring the entire string to match.
 /// Returns the result of running the provided parser on the provided input.
 let parseLine parser input =
     P.run (ws >>. parser .>> ws .>> P.eof) input
     |> function
-        | P.Success (r, _, _) -> ParseResult.Success r
-        | P.Failure (e, _, _) -> ParseResult.Error e
+        | P.Success (r, _, _) -> Result.Ok r
+        | P.Failure (e, _, _) -> Result.Error e
