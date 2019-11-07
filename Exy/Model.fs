@@ -105,7 +105,7 @@ let rec evaluate state expression =
     | Div (a, b) -> Result.bind2 safeDiv (evaluate state a) (evaluate state b)
     | Grp g -> evaluate state g
     | Num n -> Ok n
-    | Var v -> lookup state v |> Option.map (evaluate state) |> Result.fromOption (sprintf "Unbound variable: %s." v) |> Result.unpack
+    | Var v -> lookup state v |> Option.map (evaluate state) |> Result.fromOption (sprintf "Unbound variable: %s." v)
 
 /// Return all variables used in an expression.
 let rec usedVars state expression : Set<string> =

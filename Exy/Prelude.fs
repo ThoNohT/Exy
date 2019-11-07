@@ -22,14 +22,8 @@ module Result =
     /// Converts an option to a result with the specified error message.
     let fromOption error opt =
         match opt with
-        | Some v -> Ok v
+        | Some v -> v
         | None -> fail error
-
-    /// Unpacks a result from another result.
-    let unpack result =
-        match result with
-        | Ok r -> r
-        | Error e -> Error e
 
     /// Returns the result value. If the result is an error, the error is displayed and a default value is returned.
     let valueOrShowWithDefault defaultValue prefix result =
