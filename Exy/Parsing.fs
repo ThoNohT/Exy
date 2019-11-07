@@ -69,9 +69,9 @@ let private binding : Parser<Statement, Unit> =
         return Binding (var, expr)
     }
 
-/// Parse a clear satement, format: clear varStr.
+/// Parse a clear satement, format: clear varStr. Or just clear.
 let private clear : Parser<Statement, Unit> =
-    P.skipString "clear" .>>. ws >>. varStr
+    P.skipString "clear" .>>. ws >>. P.opt varStr
     |>> Clear
 
 /// Parse an exit statement, format: exit.

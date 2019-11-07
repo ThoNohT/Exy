@@ -61,7 +61,9 @@ let loadState fileName : Result<State,string> =
 let rec handleStatement (state: State) statement =
     match statement with
     | Clear n ->
-        state |> Map.remove n
+        match n with
+        | Some v -> state |> Map.remove v
+        | None -> Map.empty
 
     | Exit ->
         Environment.Exit 0

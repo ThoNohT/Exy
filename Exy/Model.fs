@@ -23,8 +23,8 @@ type Expression =
 type Statement =
     /// Binding of an expression to a variable.
     | Binding of string * Expression
-    /// Clearing a variable binding.
-    | Clear of string
+    /// Clearing one, or all variable bindings.
+    | Clear of string option
     /// Calculation of an expression.
     | Calculation of Expression
     /// Exit the program.
