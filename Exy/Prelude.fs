@@ -3,17 +3,30 @@ module Prelude
 
 /// Helpers for the Result<'T,'TError> type.
 module Result =
+    // Note that due to the error collecting behavior implemented in apply, this functionality is no longer consistent
+    // with monad. Implementing bind from these methods would work incorrectly due to not short-circuiting.
+    // Consider not using the built-in Result type but creating a dedicated type that cannot be used with an expression
+    // builder as that needs a proper monad implementation.
+
     /// Returns an error with a single message
     let fail error =
         Error <| Set.singleton error
 
-    /// Bind a function on two results.
-    let bind2 f a b =
-        match a, b with
-        | Ok av, Ok bv -> f av bv
-        | Ok _, Error e -> Error e
+    // Apply a function in a result to another result.
+    let apply a f =
+        match f, a with
+        | Ok fv, Ok av -> Ok (fv av)
+        | Ok _, Error e
         | Error e, Ok _ -> Error e
         | Error e1, Error e2 -> Error <| Set.union e1 e2
+
+    /// Bind a function on two results.
+    let bind2 f a b =
+        let tuple a b = (a, b)
+        let uncurry f (a, b) = f a b
+
+        let tupled = Result.map tuple a |> (apply b)
+        Result.bind <| uncurry f <| tupled
 
     /// Map a function on two results.
     let map2 f a b =
