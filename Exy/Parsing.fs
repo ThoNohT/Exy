@@ -9,6 +9,8 @@ module P = FParsec.Internals
 
 /// Parse and ignore whitespace characters.
 let private ws = P.unicodeSpaces
+/// Parse and ignore whitespace characters (at least 1).
+let private ws1 = P.unicodeSpaces1
 
 /// Parse a numeric character.
 let private numeric =
@@ -20,13 +22,27 @@ let private numeric =
 /// Parse an alphanumeric character.
 let private alphaNumeric = P.asciiLetter <|> numeric
 
-/// parse a file name, formatted as filename.exy
+/// Parse a file name, formatted as filename.exy
 let private fileName : Parser<string, unit> =
     P.many1Chars alphaNumeric .>>. P.pstring ".exy" |>> (fun (a,b) -> sprintf "%s%s" a b)
 
+/// Parse a truthness value.
+let private truthness : Parser<Expression, unit> =
+    P.attempt <|
+        (P.pstring "Yes" |>> (fun _ -> Truth Yes)) <|> (P.pstring "No" |>> (fun _ -> Truth No))
+
 /// Parse a string representing a variable name. Starts with a letter and is followed by letters or numbers.
 let private varStr =
-    P.many1Chars2 P.asciiLetter alphaNumeric
+    let restrictedNames = [ "Yes"; "No" ]
+
+    parse {
+        let! name = P.many1Chars2 P.asciiLetter alphaNumeric
+
+        if List.contains name restrictedNames then
+            return! P.fail "Restricted variable name"
+        else
+            return name
+    }
 
 /// Parse a variable name. The same as varStr, but wrapped in a Var.
 let private var : Parser<Expression, unit> =
@@ -47,23 +63,30 @@ let private expression : Parser<Expression, unit> =
     let opp = new OperatorPrecedenceParser<Expression, string, unit>()
     let allowSpacesThenEmpty = ws >>. P.stringReturn "" ""
 
-    let newOp op prio mapping = InfixOperator (op, allowSpacesThenEmpty, prio, Associativity.Left, mapping)
+    let newlOp op prio mapping = InfixOperator (op, allowSpacesThenEmpty, prio, Associativity.Left, mapping)
+    let newnOp op prio mapping = InfixOperator (op, allowSpacesThenEmpty, prio, Associativity.None, mapping)
 
-    opp.TermParser <- (var <|> number <|> (group <| opp.ExpressionParser)) .>> ws
+    opp.TermParser <- (truthness <|> var <|> number <|> (group <| opp.ExpressionParser)) .>> ws
 
-    opp.AddOperator <| newOp "-" 1 (fun left right -> Sub (left,right))
-    opp.AddOperator <| newOp "+" 1 (fun left right -> Add (left,right))
-    opp.AddOperator <| newOp "%" 2 (fun left right -> Rem (left,right))
-    opp.AddOperator <| newOp "*" 2 (fun left right -> Mul (left,right))
-    opp.AddOperator <| newOp "/" 2 (fun left right -> Div (left,right))
+    opp.AddOperator <| newnOp "=" 1 (fun left right -> Com (Same, left,right))
+    opp.AddOperator <| newnOp ">" 1 (fun left right -> Com (Gt, left,right))
+    opp.AddOperator <| newnOp "<" 1 (fun left right -> Com (Lt, left,right))
+    opp.AddOperator <| newnOp "<=" 1 (fun left right -> Com (Lts, left,right))
+    opp.AddOperator <| newnOp ">=" 1 (fun left right -> Com (Gts, left,right))
+    opp.AddOperator <| newlOp "-" 2 (fun left right -> Sub (left,right))
+    opp.AddOperator <| newlOp "+" 2 (fun left right -> Add (left,right))
+    opp.AddOperator <| newlOp "%" 3 (fun left right -> Rem (left,right))
+    opp.AddOperator <| newlOp "*" 3 (fun left right -> Mul (left,right))
+    opp.AddOperator <| newlOp "/" 3 (fun left right -> Div (left,right))
 
     opp.ExpressionParser
 
 /// Parse a binding, format: varStr = expression.
 let private binding : Parser<Statement, Unit> =
     parse {
+        do! P.pstring "let" >>. ws1
         let! var = varStr
-        do! ws .>> P.pchar '=' .>> ws
+        do! ws .>> P.pchar '=' >>. ws
         let! expr = expression
 
         return Binding (var, expr)
@@ -101,7 +124,7 @@ let statement : Parser<Statement, unit> =
     <|> calculation
 
 /// Parses a confirmation message. Can be either y/n/yes/no, case insensitive.
-let confirmation : Parser<Confirmation, unit> =
+let confirmation : Parser<Truth, unit> =
     (P.regex "[Yy]([Ee][Ss])?" |>> (fun _ -> Yes))
     <|> (P.regex "[Nn][Oo]?" |>> (fun _ -> No))
 

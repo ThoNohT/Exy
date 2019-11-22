@@ -94,7 +94,7 @@ let rec handleStatement (state: State) statement =
 
         // Evaluate the expression.
         match evaluate state e with
-        | Ok  n -> printfn "Evaluates to %M" n
+        | Ok  n -> printfn "Evaluates to %s" (displayValue n)
         | Error e -> printfn "No evaluation possible: %s" (String.Join (", ", e))
         state
 

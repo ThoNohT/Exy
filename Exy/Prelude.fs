@@ -54,3 +54,7 @@ module Result =
             Ok r
         | Error e ->
             Error e
+
+    /// Turns a pure function into a function that returns an Ok result.
+    let hoist2 (f: 'a -> 'b -> 'c): ('a -> 'b -> Result<'c, Set<string>>) =
+        (fun a b -> Ok <| f a b)
