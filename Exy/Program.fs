@@ -21,7 +21,7 @@ let saveState (state: State) fileName =
     let save () =
         let fileContents =
             state |> Map.toList
-            |> List.map (fun (k, e) -> sprintf "%s = %s" k (displayExpr e))
+            |> List.map (fun (k, e) -> sprintf "%s = %s" k (Expression.display e))
         File.WriteAllLines (fileName, fileContents)
         printfn "Saved %s." fileName
 
@@ -35,9 +35,9 @@ let saveState (state: State) fileName =
 let handleBinding state statement =
     match statement with
     | Binding (var, expression) ->
-        let used = usedVars state expression
+        let used = Expression.usedVars state expression
         if Set.contains var used then
-            Error <| sprintf "Binding %s to variable %s would create a circular reference." var (displayExpr expression)
+            Error <| sprintf "Binding %s to variable %s would create a circular reference." var (Expression.display expression)
         else
             state |> Map.remove var |> Map.add var expression |> Ok
     | _ ->
@@ -83,18 +83,18 @@ let rec handleStatement (state: State) statement =
         |> Result.valueOrShowWithDefault state "Binding error: "
 
     | Calculation e ->
-        let varVal = expandVariable state e
-        let expanded = expand state e
+        let varVal = Expression.expandVariable state e
+        let expanded = Expression.expand state e
 
         // Display the expanded value of a variable.
-        printfn "Value: %s" (displayExpr varVal)
+        printfn "Value: %s" (Expression.display varVal)
 
         // Display the completely expanded expression, if different than the variable value.
-        if expanded <> varVal then printfn "Expands to %s" (displayExpr expanded)
+        if expanded <> varVal then printfn "Expands to %s" (Expression.display expanded)
 
         // Evaluate the expression.
-        match evaluate state e with
-        | Ok  n -> printfn "Evaluates to %s" (displayValue n)
+        match Expression.evaluate state e with
+        | Ok  n -> printfn "Evaluates to %s" (Value.display n)
         | Error e -> printfn "No evaluation possible: %s" (String.Join (", ", e))
         state
 
