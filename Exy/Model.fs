@@ -293,7 +293,7 @@ module Expression =
         | Div _ | Mul _ | Rem _ | Add _ | Sub _ | Num _ -> Ok Type.Number
         | Com _ -> Ok Type.Truth
         | Grp s -> getType state s
-        | Var v -> State.lookup state v |> Option.map (getType state) |> Result.fromOption (sprintf "Unbound variable %s" v)
+        | Var v -> State.lookup state v |> Option.map (getType state) |> Result.fromOption (fun () -> sprintf "Unbound variable %s" v)
         | Truth _ -> Ok Type.Truth
         | Aggr (a, m) ->
             let aType = Aggregation.getType a
@@ -355,7 +355,7 @@ module Expression =
                         // Empty list of variables.
                         Aggregation.zeroValue aggregation
                             |> Option.map Ok
-                            |> Result.fromOption (sprintf "Aggregation %A over an empty set of variables is not possible." aggrType)
+                            |> Result.fromOption (fun () -> sprintf "Aggregation %A over an empty set of variables is not possible." aggrType)
                     | _ ->
                         // Non-empty list, and all variables are of the same type.
                         VariableMask.getVariables state mask |> Map.toList
@@ -408,7 +408,7 @@ module Expression =
                             // Empty list of variables.
                             Aggregation.zeroValue aggregation
                                 |> Option.map Ok
-                                |> Result.fromOption (failwith  "Type check should have been done before")
+                                |> Result.fromOption (fun () -> failwith  "Type check should have been done before")
                         | Option.Some mt ->
                             // Non-empty list, and all variables are of the same type.
                             VariableMask.getVariables state mask |> Map.toList
@@ -431,7 +431,7 @@ module Expression =
         | Grp (g) -> evaluate state g
         | Num n -> Ok (Value.Number n)
         | Truth t -> Ok (Value.Truth t)
-        | Var v -> State.lookup state v |> Option.map (evaluate state) |> Result.fromOption (sprintf "Unbound variable: %s." v)
+        | Var v -> State.lookup state v |> Option.map (evaluate state) |> Result.fromOption (fun () -> sprintf "Unbound variable: %s." v)
 
     /// Return all variables used in an expression.
     let rec usedVars state expression : Set<string> =

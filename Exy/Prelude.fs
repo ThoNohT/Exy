@@ -75,7 +75,7 @@ module Result =
     let fromOption error opt =
         match opt with
         | Some v -> v
-        | None -> fail error
+        | None -> fail (error ())
 
     /// Returns the result value. If the result is an error, the error is displayed and a default value is returned.
     let valueOrShowWithDefault defaultValue prefix result =
