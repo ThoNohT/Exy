@@ -180,7 +180,7 @@ let private binding : Parser<Statement, Unit> =
 
 /// Parse a clear satement, format: clear varStr. Or just clear.
 let private clear : Parser<Statement, Unit> =
-    P.skipString "clear" .>>. ws >>. P.opt (varStr) // TODO: Change this to a variable mask too?
+    P.skipString "clear" .>>. ws >>. P.opt (varMask)
     |>> Clear
 
 /// Parse an exit statement, format: exit.

@@ -3,10 +3,14 @@ module Prelude
 
 open System.Text.RegularExpressions
 
+/// Matches a string with a regex.
 let (|Regex|_|) pattern input =
     let m = Regex.Match(input, pattern)
     if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
     else None
+
+/// Flips a function's parameters.
+let flip f a b = f b a
 
 /// Helpers for the Result<'T,'TError> type.
 module Result =

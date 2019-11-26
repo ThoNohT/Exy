@@ -458,7 +458,7 @@ type Statement =
     /// Binding of an expression to a variable.
     | Binding of string * Expression
     /// Clearing one, or all variable bindings.
-    | Clear of string option
+    | Clear of VariableMask option
     /// Calculation of an expression.
     | Calculation of Expression
     /// Display all variables covered by a mask.
