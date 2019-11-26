@@ -55,7 +55,7 @@ let private var : Parser<Expression, unit> =
 let private varMask : Parser<VariableMask, unit> =
     let part : Parser<MaskPart, unit> =
         (P.pchar '*' |>> (fun _ -> Wildcard))
-        <|> P.attempt (P.many1 varChar |>> (string >> Literal))
+        <|> P.attempt (P.many1 varChar |>> (List.map string >> String.concat "" >> Literal))
 
     P.many1 part |>> VariableMask
 
