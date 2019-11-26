@@ -21,7 +21,7 @@ let saveState (state: State) fileName =
     let save () =
         let fileContents =
             state |> Map.toList
-            |> List.map (fun (k, e) -> sprintf "%s = %s" k (Expression.display e))
+            |> List.map (fun (k, e) -> sprintf "let %s = %s" k (Expression.display e))
         File.WriteAllLines (fileName, fileContents)
         printfn "Saved %s." fileName
 
@@ -43,6 +43,24 @@ let handleBinding state statement =
     | _ ->
         Error "Statement is not a binding."
 
+/// Handles a mask display, listing all variables that are matched by the mask.
+let handleMaskDisplay state mask =
+    let matchingVars = VariableMask.getVariables state mask |> Map.toList
+
+    if List.isEmpty matchingVars then
+        printn "No matching variables."
+    else
+        for (name, expr) in matchingVars do
+            printf "Variable: %s. " name
+
+            let eval = Expression.evaluate state expr
+            match eval with
+            | Error e -> printfn "No evaluation possible: %s" (String.Join (", ", e))
+            | Ok v ->
+                let vType = Value.getType v
+                printfn "Type: %A. Evaluates to: %s." vType (Value.display v)
+    ()
+
 /// Loads new state from a filename. Returning the new state if succesful, or an error with an error message if not.
 let loadState fileName : Result<State,string> =
     if not <| File.Exists fileName then
@@ -63,7 +81,7 @@ let rec handleStatement (state: State) statement =
     | Clear n ->
         match n with
         | Some v -> state |> Map.remove v
-        | None -> Map.empty
+        | Option.None -> Map.empty
 
     | Exit ->
         Environment.Exit 0
@@ -81,6 +99,10 @@ let rec handleStatement (state: State) statement =
     | Binding _ ->
         handleBinding state statement
         |> Result.valueOrShowWithDefault state "Binding error: "
+
+    | MaskDisplay mask ->
+        handleMaskDisplay state mask
+        state
 
     | Calculation e ->
         let varVal = Expression.expandVariable state e

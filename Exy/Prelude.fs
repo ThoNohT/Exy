@@ -1,6 +1,13 @@
 ﻿[<AutoOpen>]
 module Prelude
 
+open System.Text.RegularExpressions
+
+let (|Regex|_|) pattern input =
+    let m = Regex.Match(input, pattern)
+    if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
+    else None
+
 /// Helpers for the Result<'T,'TError> type.
 module Result =
     // Note that due to the error collecting behavior implemented in apply, this functionality is no longer consistent
@@ -27,6 +34,34 @@ module Result =
 
         let tupled = Result.map tuple a |> (apply b)
         Result.bind <| uncurry f <| tupled
+
+    /// Indicates whether a  result is an error.
+    let isError r =
+        match r with
+        | Ok _ -> false
+        | Error _ -> true
+
+    /// Get the value of a result.
+    let private value r =
+        match r with
+        | Ok v -> v
+        | Error _ -> failwith "Tried to get result of error"
+
+    /// Get the error of a result.
+    let private error r =
+        match r with
+        | Ok _ -> failwith "Tried to get error of ok"
+        | Error e -> e
+
+    /// Aggregate a list of results into a single result. Multiple errors are combined, discarding the succesful results.
+    /// If all results are succesful, one Ok is returned.
+    let aggregate (rs: Result<'a, Set<string>> list) : Result<'a list, Set<string>> =
+        let errors = List.filter isError rs
+
+        if List.isEmpty errors then
+            Ok <| List.map value rs
+        else
+            Error <| (Set.unionMany <| List.map error errors)
 
     /// Map a function on two results.
     let map2 f a b =

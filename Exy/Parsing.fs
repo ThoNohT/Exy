@@ -48,6 +48,15 @@ let private varStr =
 let private var : Parser<Expression, unit> =
     varStr |>> Var
 
+/// Parse a variable mask. A varStr, but with the '*' character included.
+let private varMask : Parser<VariableMask, unit> =
+    let part : Parser<MaskPart, unit> =
+        (P.pchar '*' |>> (fun _ -> Wildcard))
+        <|> P.attempt (varStr |>> Literal)
+
+    P.many1 part |>> VariableMask
+
+
 /// Parse a number, wrapped in a Num. Can be a positive or negative number, with or without decimal separator '.'.
 let private number : Parser<Expression, unit> =
     P.numberLiteral (NumberLiteralOptions.AllowMinusSign ||| NumberLiteralOptions.AllowFraction) "number"
@@ -58,15 +67,44 @@ let private group subParser : Parser<Expression, unit> =
     P.between (P.pchar '(' .>> ws) (P.pchar ')' .>> ws) (subParser .>> ws)
     |>> Grp
 
-/// Parse an expression. Can either be a variable, a number, an operator, or a grouped expression.
-let private expression : Parser<Expression, unit> =
+/// An aggregation type for truths.
+let truthAggregationType =
+    P.attempt <|
+        (P.attempt <| P.pstring "All" |>> (fun _ -> All))
+        <|> (P.attempt <| P.pstring "Any" |>> (fun _ -> Any))
+        <|> (P.attempt <| P.pstring "None" |>> (fun _ -> None))
+
+/// An aggregation type for numbers.
+let numAggregationType =
+        (P.attempt <| P.pstring "Sum" |>> (fun _ -> Sum))
+        <|> (P.attempt <| P.pstring "Prod" |>> (fun _ -> Prod))
+        <|> (P.attempt <| P.pstring "Count" |>> (fun _ -> Count))
+        <|> (P.attempt <| P.pstring "Min" |>> (fun _ -> Min))
+        <|> (P.attempt <| P.pstring "Max" |>> (fun _ -> Max))
+        <|> (P.attempt <| P.pstring "Avg" |>> (fun _ -> Avg))
+        <|> (P.attempt <| P.pstring "Med" |>> (fun _ -> Med))
+
+/// Any type of aggregration type.
+let aggregationType =
+    (P.attempt truthAggregationType) <|> (P.attempt numAggregationType)
+
+/// A comparison operator
+let comparisonOperator : Parser<Comparison, unit> =
+        (P.pstring "=" |>> (fun _ -> Same))
+        <|> (P.pstring "<" |>> (fun _ -> Lt))
+        <|> (P.pstring ">" |>> (fun _ -> Gt))
+        <|> (P.attempt <| P.pstring "<=" |>> (fun _ -> Lts))
+        <|> (P.attempt <| P.pstring ">=" |>> (fun _ -> Gts))
+
+/// Parse an expression.
+let rec private expression : Parser<Expression, unit> =
     let opp = new OperatorPrecedenceParser<Expression, string, unit>()
     let allowSpacesThenEmpty = ws >>. P.stringReturn "" ""
 
     let newlOp op prio mapping = InfixOperator (op, allowSpacesThenEmpty, prio, Associativity.Left, mapping)
     let newnOp op prio mapping = InfixOperator (op, allowSpacesThenEmpty, prio, Associativity.None, mapping)
 
-    opp.TermParser <- (truthness <|> var <|> number <|> (group <| opp.ExpressionParser)) .>> ws
+    opp.TermParser <- (truthness <|> var <|> number <|> aggregation <|> (group <| opp.ExpressionParser)) .>> ws
 
     opp.AddOperator <| newnOp "=" 1 (fun left right -> Com (Same, left,right))
     opp.AddOperator <| newnOp ">" 1 (fun left right -> Com (Gt, left,right))
@@ -81,6 +119,54 @@ let private expression : Parser<Expression, unit> =
 
     opp.ExpressionParser
 
+/// Parse an aggregation, can be either simple or with a predicate.
+and aggregation : Parser<Expression, unit> =
+    let simpleAggr =
+        parse {
+            do! P.pchar '[' >>. ws
+            let! typ = aggregationType
+            do! ws >>. P.pchar '|' >>. ws
+            let! msk = varMask
+            do! ws .>> P.pchar ']'
+
+            return Aggr (typ, msk)
+        }
+
+    let predAggr =
+        parse {
+            do! P.pchar '[' >>. ws
+            let! typ = truthAggregationType
+            do! ws >>. P.pchar '|' >>. ws
+            let! msk = varMask
+            do! ws >>. P.pchar '|' >>. ws
+            let! pred = predicate
+            do! ws .>> P.pchar ']'
+
+            return PredAggr (typ, msk, pred)
+        }
+
+    (P.attempt simpleAggr) <|> (P.attempt predAggr)
+
+/// Parse a predicate, can be either a numeric predicate, with a comparison operator, or a simple truth predicate.
+and predicate : Parser<Predicate, Unit> =
+    let numPred =
+        parse {
+            let! comp = comparisonOperator
+            do! ws
+            let! expr = expression
+
+            return NumberPredicate (comp, expr)
+        }
+
+    let truthPred =
+        parse {
+            let! expr = expression
+
+            return TruthPredicate expr
+        }
+
+    (P.attempt numPred) <|> (P.attempt truthPred)
+
 /// Parse a binding, format: varStr = expression.
 let private binding : Parser<Statement, Unit> =
     parse {
@@ -94,7 +180,7 @@ let private binding : Parser<Statement, Unit> =
 
 /// Parse a clear satement, format: clear varStr. Or just clear.
 let private clear : Parser<Statement, Unit> =
-    P.skipString "clear" .>>. ws >>. P.opt varStr
+    P.skipString "clear" .>>. ws >>. P.opt (varStr) // TODO: Change this to a variable mask too?
     |>> Clear
 
 /// Parse an exit statement, format: exit.
@@ -102,15 +188,19 @@ let private exit : Parser<Statement, Unit> =
     P.skipString "exit" .>>. ws
     |>> (fun _ -> Exit)
 
-// Parse a save statement, format: save filename.
+/// Parse a save statement, format: save filename.
 let private save : Parser<Statement, Unit> =
     P.skipString "save" .>>. ws >>. fileName
     |>> Save
 
-// Parse a load statement, format: load filename.
+/// Parse a load statement, format: load filename.
 let private load : Parser<Statement, Unit> =
     P.skipString "load" .>>. ws >>. fileName
     |>> Load
+
+/// Parse a variable mask display statement.
+let private maskDisplay : Parser<Statement, Unit> =
+    P.skipString "mask" .>>. ws >>. varMask |>> MaskDisplay
 
 /// Parse a statement. Can either be an binding, or an expression.
 let statement : Parser<Statement, unit> =
@@ -121,6 +211,7 @@ let statement : Parser<Statement, unit> =
     <|> (P.attempt load)
     <|> (P.attempt clear)
     <|> (P.attempt binding)
+    <|> (P.attempt maskDisplay)
     <|> calculation
 
 /// Parses a confirmation message. Can be either y/n/yes/no, case insensitive.
