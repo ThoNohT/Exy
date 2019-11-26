@@ -22,6 +22,9 @@ let private numeric =
 /// Parse an alphanumeric character.
 let private alphaNumeric = P.asciiLetter <|> numeric
 
+/// Parse a variable character. Can be alphanumeric, or an underscore.
+let private varChar = alphaNumeric <|> P.pchar '_'
+
 /// Parse a file name, formatted as filename.exy
 let private fileName : Parser<string, unit> =
     P.many1Chars alphaNumeric .>>. P.pstring ".exy" |>> (fun (a,b) -> sprintf "%s%s" a b)
@@ -36,7 +39,7 @@ let private varStr =
     let restrictedNames = [ "Yes"; "No" ]
 
     parse {
-        let! name = P.many1Chars2 P.asciiLetter alphaNumeric
+        let! name = P.many1Chars2 P.asciiLetter varChar
 
         if List.contains name restrictedNames then
             return! P.fail "Restricted variable name"
@@ -52,7 +55,7 @@ let private var : Parser<Expression, unit> =
 let private varMask : Parser<VariableMask, unit> =
     let part : Parser<MaskPart, unit> =
         (P.pchar '*' |>> (fun _ -> Wildcard))
-        <|> P.attempt (varStr |>> Literal)
+        <|> P.attempt (P.many1 varChar |>> (string >> Literal))
 
     P.many1 part |>> VariableMask
 

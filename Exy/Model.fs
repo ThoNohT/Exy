@@ -71,7 +71,7 @@ module VariableMask =
         let getRegexString p =
             match p with
             | Literal s -> s
-            | Wildcard -> "[A-Za-z0-9]+"
+            | Wildcard -> "[A-Za-z0-9_]+"
 
         let regexContents = List.map getRegexString m |> String.concat ""
         let regexString = sprintf "\\A%s\\z" regexContents
