@@ -25,9 +25,9 @@ let private alphaNumeric = P.asciiLetter <|> numeric
 /// Parse a variable character. Can be alphanumeric, or an underscore.
 let private varChar = alphaNumeric <|> P.pchar '_'
 
-/// Parse a file name, formatted as filename.exy
+/// Parse a file name, formatted as filename.exy, where .exy is implicit.
 let private fileName : Parser<string, unit> =
-    P.many1Chars alphaNumeric .>>. P.pstring ".exy" |>> (fun (a,b) -> sprintf "%s%s" a b)
+    P.many1Chars varChar |>> (fun a -> sprintf "%s.exy" a)
 
 /// Parse a truthness value.
 let private truthness : Parser<Expression, unit> =
