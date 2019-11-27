@@ -81,7 +81,7 @@ let rec handleStatement (state: State) statement =
     | Clear n ->
         match n with
         | Some mask ->
-            VariableMask.getVariables state mask |> Map.toList |> List.map (fun (n, _) -> n)
+            VariableMask.getVariables state mask |> Map.toList |> List.map fst
                 |> List.fold (flip Map.remove) state
         | Option.None -> Map.empty
 

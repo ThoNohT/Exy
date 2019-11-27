@@ -309,7 +309,7 @@ module Expression =
 
     // Get the type of a variable mask.
     and getMaskType state mask : Result<Type option, Set<string>> =
-        let vars = VariableMask.getVariables state mask |> Map.toList |> List.map (fun (_, b) -> b)
+        let vars = VariableMask.getVariables state mask |> Map.toList |> List.map snd
         let types = List.map (getType state) vars |> Result.aggregate |> Result.map List.distinct
 
         types |> Result.bind
@@ -359,7 +359,7 @@ module Expression =
                     | _ ->
                         // Non-empty list, and all variables are of the same type.
                         VariableMask.getVariables state mask |> Map.toList
-                            |> List.map (fun (_, v) -> v) |> List.map (evaluate state) |> Result.aggregate
+                            |> List.map snd |> List.map (evaluate state) |> Result.aggregate
                             |> Result.map (Aggregation.apply aggregation)
 
         /// Handle an aggregation with a predicate.
@@ -412,7 +412,7 @@ module Expression =
                         | Option.Some mt ->
                             // Non-empty list, and all variables are of the same type.
                             VariableMask.getVariables state mask |> Map.toList
-                                |> List.map (fun (_, v) -> v) |> List.map (evaluate state) |> Result.aggregate
+                                |> List.map snd |> List.map (evaluate state) |> Result.aggregate
                                 |> Result.bind (fun values -> applyPredAggregation mt pred aggregation values)
 
                 )
@@ -442,9 +442,9 @@ module Expression =
         | Add (a, b)
         | Sub (a, b)
         | Com (_,a , b) -> Set.union (usedVars state a) (usedVars state b)
-        | Aggr (_, m) -> VariableMask.getVariables state m |> Map.toList |> List.map(fun (k, _) -> k) |> Set.ofList
+        | Aggr (_, m) -> VariableMask.getVariables state m |> Map.toList |> List.map fst |> Set.ofList
         | PredAggr (_, m, p) ->
-            let maskVars = VariableMask.getVariables state m |> Map.toList |> List.map(fun (k, _) -> k) |> Set.ofList
+            let maskVars = VariableMask.getVariables state m |> Map.toList |> List.map fst |> Set.ofList
             match p with
             | TruthPredicate e
             | NumberPredicate (_, e) -> Set.union maskVars (usedVars state e)
